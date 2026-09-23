@@ -1,0 +1,54 @@
+{% extends "reviews/base.html" %}
+{% load review_tags %}
+{% block title %}Case {{ case.case_id }} · IdeaFlow{% endblock %}
+{% block content %}
+<nav class="breadcrumbs"><a href="{% url 'home' %}">Bundles</a><span>/</span><a href="{% url 'bundle' bundle.pk %}">{{ bundle.display_name }}</a><span>/</span><span>Case {{ case.case_id }}</span></nav>
+<section class="review-heading">
+  <div><p class="eyebrow">Case {{ case.position }} of {{ bundle.case_count }}</p><h1>Case {{ case.case_id }}</h1></div>
+  <span class="status-pill {% if case.completed %}done{% endif %}">{% if case.completed %}Saved{% else %}In progress{% endif %}</span>
+</section>
+
+<section class="review-layout">
+  <aside class="evidence-column">
+    <div class="sticky-stack">
+      <div class="instruction-card">
+        <strong>Use only this packet</strong>
+        <p>Do not browse, infer absent evidence, or consult another reviewer. Missing required evidence means <em>insufficient evidence</em>, not failure.</p>
+      </div>
+      {% for ref, item in case.packet.evidence.items %}
+        <article class="evidence-card">
+          <header><span class="kind">{{ item.kind }}</span><code>{{ ref }}</code></header>
+          <div class="evidence-body">{{ item.value|linebreaksbr }}</div>
+        </article>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <form method="post" class="criteria-column">
+    {% csrf_token %}
+    {% for row in criterion_rows %}
+      <fieldset class="criterion-card">
+        <legend><span>{{ forloop.counter }}</span>{{ row.criterion.dimension|humanize_key }}</legend>
+        <div class="criterion-title">
+          <h2>{{ row.criterion.description }}</h2>
+          <span class="severity {{ row.criterion.severity }}">{{ row.criterion.severity }}</span>
+        </div>
+        <p class="applicability">{{ row.criterion.applicability }}</p>
+        <div class="required-inputs"><strong>Required evidence:</strong> {{ row.criterion.required_inputs|join:", " }}</div>
+        <details><summary>Examples</summary><p><strong>Pass:</strong> {{ row.criterion.pass_example }}</p><p><strong>Fail:</strong> {{ row.criterion.fail_example }}</p></details>
+        <div class="form-grid">
+          <div>{{ row.status.label_tag }}{{ row.status }}{{ row.status.errors }}</div>
+          <div class="full">{{ row.reason.label_tag }}{{ row.reason }}{{ row.reason.errors }}</div>
+          <div class="full refs">{{ row.refs.label_tag }}{{ row.refs }}{{ row.refs.errors }}</div>
+        </div>
+      </fieldset>
+    {% endfor %}
+    {% if progress_field %}<section class="criterion-card score-card">{{ progress_field.label_tag }}{{ progress_field }}{{ progress_field.errors }}</section>{% endif %}
+    <div class="save-bar">
+      <div>{% if previous_case %}<a href="{% url 'review-case' bundle.pk previous_case.case_id %}">← Previous</a>{% endif %}</div>
+      <button type="submit">Save and {% if next_case %}continue{% else %}finish{% endif %}</button>
+      <div>{% if next_case %}<a href="{% url 'review-case' bundle.pk next_case.case_id %}">Skip for now →</a>{% endif %}</div>
+    </div>
+  </form>
+</section>
+{% endblock %}

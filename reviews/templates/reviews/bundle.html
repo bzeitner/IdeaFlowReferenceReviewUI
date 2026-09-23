@@ -1,0 +1,33 @@
+{% extends "reviews/base.html" %}
+{% block title %}{{ bundle.display_name }} · IdeaFlow{% endblock %}
+{% block content %}
+<nav class="breadcrumbs"><a href="{% url 'home' %}">Bundles</a><span>/</span><span>{{ bundle.display_name }}</span></nav>
+<section class="bundle-summary">
+  <div>
+    <p class="eyebrow">Blinded review bundle</p>
+    <h1>{{ bundle.display_name }}</h1>
+    <p class="hash-line">Plan <code>{{ bundle.plan_hash }}</code></p>
+  </div>
+  <div class="summary-count"><strong>{{ bundle.completed_count }}</strong><span>of {{ bundle.case_count }} complete</span></div>
+</section>
+<div class="progress large"><span style="width:{% widthratio bundle.completed_count bundle.case_count 100 %}%"></span></div>
+
+<div class="action-row">
+  {% if next_case %}<a class="button" href="{% url 'review-case' bundle.pk next_case.case_id %}">{% if bundle.completed_count %}Continue review{% else %}Begin review{% endif %}</a>{% endif %}
+  {% if bundle.completed_count == bundle.case_count and bundle.case_count %}<a class="button secondary" href="{% url 'export-bundle' bundle.pk %}">Export assessment ZIP</a>{% endif %}
+</div>
+
+<section class="case-list">
+  {% for case in cases %}
+    <a href="{% url 'review-case' bundle.pk case.case_id %}" class="case-row {% if case.completed %}complete{% endif %}">
+      <span class="case-position">{{ case.position|stringformat:"02d" }}</span>
+      <span>Case {{ case.case_id }}</span>
+      <span class="case-state">{% if case.completed %}Complete{% else %}Not reviewed{% endif %}</span>
+    </a>
+  {% endfor %}
+</section>
+
+<form method="post" action="{% url 'delete-bundle' bundle.pk %}" class="danger-zone" onsubmit="return confirm('Delete this local packet copy and all draft assessments?');">
+  {% csrf_token %}<button class="text-button" type="submit">Delete local bundle</button>
+</form>
+{% endblock %}

@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# Local reviewer content and Python build products.
+.venv/
+__pycache__/
+*.py[cod]
+review-data.sqlite3
+*.tar.gz
+*.tgz
+*.zip
+.DS_Store

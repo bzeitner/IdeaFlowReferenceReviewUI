@@ -1,0 +1,47 @@
+{% extends "reviews/base.html" %}
+{% block title %}Review bundles · IdeaFlow{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">Independent human calibration</p>
+  <h1>Review research without model or cohort clues.</h1>
+  <p>Import only the archive assigned to you. Packet content and draft judgments remain in this computer’s local SQLite database.</p>
+</section>
+
+<section class="panel upload-panel">
+  <div>
+    <h2>Import reviewer packets</h2>
+    <p class="muted">Do not import another reviewer’s archive or discuss judgments before both reviews are complete.</p>
+  </div>
+  <form method="post" action="{% url 'upload-bundle' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% with active_form=form %}
+      <label for="id_display_name">Local bundle name</label>
+      {{ active_form.display_name|default_if_none:"" }}
+      {% if active_form.display_name.errors %}<div class="field-error">{{ active_form.display_name.errors }}</div>{% endif %}
+      <label for="id_archive">Packet archive</label>
+      {{ active_form.archive|default_if_none:"" }}
+      {% if active_form.archive.errors %}<div class="field-error">{{ active_form.archive.errors }}</div>{% endif %}
+    {% endwith %}
+    {% if not form %}
+      <input id="id_display_name" name="display_name" maxlength="120" required placeholder="Brad — plan 1">
+      <input id="id_archive" name="archive" type="file" accept=".gz,.tgz,application/gzip" required>
+    {% endif %}
+    <button type="submit">Import packets</button>
+  </form>
+</section>
+
+<section class="section-heading">
+  <div><p class="eyebrow">On this computer</p><h2>Review bundles</h2></div>
+</section>
+<div class="bundle-grid">
+  {% for bundle in bundles %}
+    <a class="bundle-card" href="{% url 'bundle' bundle.pk %}">
+      <div class="bundle-card-top"><strong>{{ bundle.display_name }}</strong><span>{{ bundle.completed_count }}/{{ bundle.case_count }}</span></div>
+      <div class="progress"><span style="width:{% widthratio bundle.completed_count bundle.case_count 100 %}%"></span></div>
+      <p>Imported {{ bundle.imported_at|date:"M j, Y · H:i" }} UTC</p>
+    </a>
+  {% empty %}
+    <div class="empty-state">No packet archive has been imported.</div>
+  {% endfor %}
+</div>
+{% endblock %}

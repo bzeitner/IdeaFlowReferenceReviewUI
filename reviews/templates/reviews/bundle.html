@@ -7,6 +7,7 @@
     <p class="eyebrow">Blinded review bundle</p>
     <h1>{{ bundle.display_name }}</h1>
     <p class="hash-line">Plan <code>{{ bundle.plan_hash }}</code></p>
+    {% if bundle.review_mode == "model_assisted_error_audit_v1" %}<p class="assisted-notice"><strong>Model-assisted error audit.</strong> These judgments are not blinded independent labels.</p>{% endif %}
   </div>
   <div class="summary-count"><strong>{{ bundle.completed_count }}</strong><span>of {{ bundle.case_count }} complete</span></div>
 </section>

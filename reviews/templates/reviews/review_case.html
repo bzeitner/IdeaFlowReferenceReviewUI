@@ -12,8 +12,13 @@
   <aside class="evidence-column">
     <div class="sticky-stack">
       <div class="instruction-card">
-        <strong>Use only this packet</strong>
-        <p>Do not browse, infer absent evidence, or consult another reviewer. Missing required evidence means <em>insufficient evidence</em>, not failure.</p>
+        {% if bundle.review_mode == "model_assisted_error_audit_v1" %}
+          <strong>Find automated-grader errors</strong>
+          <p>Check the automated response against this packet. Mark it correct or wrong for every criterion. Correct only what is wrong; do not browse or infer absent evidence.</p>
+        {% else %}
+          <strong>Use only this packet</strong>
+          <p>Do not browse, infer absent evidence, or consult another reviewer. Missing required evidence means <em>insufficient evidence</em>, not failure.</p>
+        {% endif %}
       </div>
       {% for ref, item in case.packet.evidence.items %}
         <article class="evidence-card">
@@ -36,7 +41,16 @@
         <p class="applicability">{{ row.criterion.applicability }}</p>
         <div class="required-inputs"><strong>Required evidence:</strong> {{ row.criterion.required_inputs|join:", " }}</div>
         <details><summary>Examples</summary><p><strong>Pass:</strong> {{ row.criterion.pass_example }}</p><p><strong>Fail:</strong> {{ row.criterion.fail_example }}</p></details>
+        {% if row.automated %}
+          <section class="automated-response">
+            <div><span class="eyebrow">Automated grader</span><strong class="automated-status {{ row.automated.status }}">{{ row.automated.status|humanize_key }}</strong></div>
+            <p>{{ row.automated.reason }}</p>
+            <p class="automated-refs"><strong>Cited:</strong> {{ row.automated.evidence_refs|join:", "|default:"No references" }}</p>
+          </section>
+        {% endif %}
         <div class="form-grid">
+          {% if row.disposition %}<div class="full disposition">{{ row.disposition.label_tag }}{{ row.disposition }}{{ row.disposition.errors }}</div>{% endif %}
+          {% if row.disposition %}<div class="full correction-label">Correction fields — required only when the automated judgment is wrong</div>{% endif %}
           <div>{{ row.status.label_tag }}{{ row.status }}{{ row.status.errors }}</div>
           <div class="full">{{ row.reason.label_tag }}{{ row.reason }}{{ row.reason.errors }}</div>
           <div class="full refs">{{ row.refs.label_tag }}{{ row.refs }}{{ row.refs.errors }}</div>

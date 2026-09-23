@@ -9,6 +9,7 @@ class ReviewBundle(models.Model):
     source_name = models.CharField(max_length=255)
     plan_hash = models.CharField(max_length=64)
     rubric_hash = models.CharField(max_length=64)
+    review_mode = models.CharField(max_length=40, default="independent_blinded_v1")
     imported_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -30,6 +31,7 @@ class ReviewCase(models.Model):
     position = models.PositiveIntegerField()
     packet = models.JSONField()
     assessment = models.JSONField(default=dict, blank=True)
+    comparison = models.JSONField(default=dict, blank=True)
     completed = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 

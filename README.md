@@ -1,6 +1,6 @@
 # IdeaFlow Reference Review UI
 
-A local-only Django interface for independently reviewing blinded IdeaFlow calibration packets. It imports an assigned `.tar.gz` packet archive, stores packets and draft judgments in a local SQLite database, validates evidence requirements, and exports one importer-compatible assessment JSON per case.
+A local-only Django interface for reviewing IdeaFlow calibration packets. It supports both independent blinded packets and explicit model-assisted error-audit packets. In assisted mode, reviewers mark each automated criterion judgment correct or wrong and provide corrections only where needed.
 
 The app does not connect to IdeaFlow, call a model, browse sources, or submit reviews. The operator separately imports completed assessments with human attestation.
 
@@ -36,6 +36,8 @@ REVIEW_UI_DATABASE=/private/path/brad-review.sqlite3 .venv/bin/python manage.py 
 - Choose `insufficient evidence` when it applies but required evidence is absent.
 - Give every criterion a concise reason.
 - Quality-rubric exports always use `"progress_score": null`.
+
+In model-assisted mode, the reviewer must explicitly mark every automated criterion result correct or wrong. Each case export is an importer-compatible envelope containing the exact automated-result fingerprint, final assessment, and difference manifest. The ZIP also includes `assisted-review-audit.json`, which summarizes the automated response and every reviewer correction. Assisted results are diagnostic error-audit evidence, not unbiased human–model agreement.
 
 After all cases are complete, export the assessment ZIP. Send that ZIP to the trusted operator; do not edit the generated JSON.
 

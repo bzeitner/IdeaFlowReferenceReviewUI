@@ -20,10 +20,12 @@ PACKET_KEYS = {
     "response_schema",
     "notice",
 }
+ASSISTED_KEYS = PACKET_KEYS | {"automated_assessment", "automated_result", "review_mode"}
+STATUSES = {"pass", "fail", "not_applicable", "insufficient_evidence"}
 
 
 def _validate_packet(packet):
-    if not isinstance(packet, dict) or set(packet) != PACKET_KEYS:
+    if not isinstance(packet, dict) or frozenset(packet) not in {frozenset(PACKET_KEYS), frozenset(ASSISTED_KEYS)}:
         raise ValidationError("A packet has unexpected or missing fields.")
     if type(packet["case_id"]) is not int or packet["case_id"] < 1:
         raise ValidationError("A packet has an invalid case ID.")
@@ -55,6 +57,44 @@ def _validate_packet(packet):
             or not isinstance(item["value"], str)
         ):
             raise ValidationError("A packet evidence entry is malformed.")
+    assisted = "automated_assessment" in packet
+    if assisted:
+        if packet["review_mode"] != "model_assisted_error_audit_v1":
+            raise ValidationError("The assisted review mode is unsupported.")
+        result = packet["automated_result"]
+        if (
+            not isinstance(result, dict)
+            or set(result) != {"id", "hash"}
+            or type(result["id"]) is not int
+            or result["id"] < 1
+            or not isinstance(result["hash"], str)
+            or not HASH.fullmatch(result["hash"])
+        ):
+            raise ValidationError("The automated result fingerprint is malformed.")
+        assessment = packet["automated_assessment"]
+        if not isinstance(assessment, dict) or set(assessment) != {"criterion_results", "progress_score"}:
+            raise ValidationError("The automated assessment is malformed.")
+        rows = assessment["criterion_results"]
+        if not isinstance(rows, list) or len(rows) != len(criteria):
+            raise ValidationError("The automated assessment does not cover every criterion.")
+        expected = {criterion["id"] for criterion in criteria}
+        observed = set()
+        for row in rows:
+            if (
+                not isinstance(row, dict)
+                or set(row) != {"id", "status", "reason", "evidence_refs"}
+                or row["id"] not in expected
+                or row["id"] in observed
+                or row["status"] not in STATUSES
+                or not isinstance(row["reason"], str)
+                or not row["reason"].strip()
+                or not isinstance(row["evidence_refs"], list)
+                or any(ref not in evidence for ref in row["evidence_refs"])
+            ):
+                raise ValidationError("An automated criterion result is malformed.")
+            observed.add(row["id"])
+        if observed != expected:
+            raise ValidationError("The automated assessment criterion IDs do not match the rubric.")
 
 
 def read_packet_archive(upload):
@@ -94,6 +134,7 @@ def read_packet_archive(upload):
     plan_hashes = {packet["plan_hash"] for packet in packets}
     rubric_hashes = {packet["rubric_hash"] for packet in packets}
     rubrics = {json.dumps(packet["rubric"], sort_keys=True) for packet in packets}
-    if len(plan_hashes) != 1 or len(rubric_hashes) != 1 or len(rubrics) != 1:
+    modes = {packet.get("review_mode", "independent_blinded_v1") for packet in packets}
+    if len(plan_hashes) != 1 or len(rubric_hashes) != 1 or len(rubrics) != 1 or len(modes) != 1:
         raise ValidationError("All packets must belong to one plan and exact rubric.")
     return packets

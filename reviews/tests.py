@@ -10,7 +10,7 @@ from django.urls import reverse
 from .models import ReviewBundle
 
 
-def packet(case_id=2, plan_hash="a" * 64):
+def packet(case_id=2, plan_hash="a" * 64, assisted=False):
     criterion = {
         "id": "evidence.support",
         "dimension": "evidence_references",
@@ -22,7 +22,7 @@ def packet(case_id=2, plan_hash="a" * 64):
         "pass_example": "Supported.",
         "fail_example": "Unsupported.",
     }
-    return {
+    value = {
         "plan_hash": plan_hash,
         "case_id": case_id,
         "case_hash": f"{case_id:064x}",
@@ -35,6 +35,25 @@ def packet(case_id=2, plan_hash="a" * 64):
         "response_schema": {"criterion_results": "rows", "progress_score": "null"},
         "notice": "Review independently.",
     }
+    if assisted:
+        value.update(
+            {
+                "review_mode": "model_assisted_error_audit_v1",
+                "automated_result": {"id": 42, "hash": "d" * 64},
+                "automated_assessment": {
+                    "criterion_results": [
+                        {
+                            "id": "evidence.support",
+                            "status": "pass",
+                            "reason": "The source supports the claim.",
+                            "evidence_refs": ["output", "source-1"],
+                        }
+                    ],
+                    "progress_score": None,
+                },
+            }
+        )
+    return value
 
 
 def archive(*packets, symlink=False):
@@ -108,6 +127,52 @@ class ReviewFlowTests(TestCase):
         linked = self.upload(archive(symlink=True))
         self.assertEqual(linked.status_code, 400)
         self.assertContains(linked, "unsupported member type", status_code=400)
+
+    def test_assisted_review_marks_correct_and_exports_difference_audit(self):
+        response = self.upload(archive(packet(2, assisted=True)))
+        self.assertEqual(response.status_code, 302)
+        bundle = ReviewBundle.objects.get()
+        self.assertEqual(bundle.review_mode, "model_assisted_error_audit_v1")
+        case = bundle.cases.get()
+        response = self.client.post(
+            reverse("review-case", args=[bundle.pk, case.case_id]),
+            {
+                "disposition_0": "correct",
+                "status_0": "pass",
+                "reason_0": "The source supports the claim.",
+                "refs_0": ["output", "source-1"],
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        case.refresh_from_db()
+        self.assertTrue(case.comparison["criteria"][0]["automated_grader_correct"])
+        response = self.client.get(reverse("export-bundle", args=[bundle.pk]))
+        body = b"".join(response.streaming_content)
+        with zipfile.ZipFile(io.BytesIO(body)) as exported:
+            audit = json.loads(exported.read("assisted-review-audit.json"))
+            envelope = json.loads(exported.read("case-2-assessment.json"))
+        self.assertEqual(audit["review_mode"], "model_assisted_error_audit_v1")
+        self.assertTrue(audit["cases"][0]["criteria"][0]["automated_grader_correct"])
+        self.assertEqual(envelope["automated_result"], packet(2, assisted=True)["automated_result"])
+        self.assertEqual(envelope["assessment"], packet(2, assisted=True)["automated_assessment"])
+        self.assertTrue(envelope["difference_manifest"]["criteria"][0]["automated_grader_correct"])
+
+    def test_assisted_wrong_requires_an_actual_correction(self):
+        self.upload(archive(packet(2, assisted=True)))
+        bundle = ReviewBundle.objects.get()
+        case = bundle.cases.get()
+        response = self.client.post(
+            reverse("review-case", args=[bundle.pk, case.case_id]),
+            {
+                "disposition_0": "wrong",
+                "status_0": "pass",
+                "reason_0": "The source supports the claim.",
+                "refs_0": ["output", "source-1"],
+            },
+        )
+        self.assertContains(response, "Mark correct, or change", status_code=200)
+        case.refresh_from_db()
+        self.assertFalse(case.completed)
 
     def test_delete_requires_post(self):
         self.upload()
